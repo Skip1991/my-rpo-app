@@ -1,0 +1,88 @@
+﻿{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block header %}Статистика{% endblock %}
+{% block content %}
+    <div class="date-filter">
+        <form method="POST" action="/statistics">
+            <label for="start_date">Дата начала:</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}">
+            <label for="end_date">Дата окончания:</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+            <button type="submit">Фильтр</button>
+        </form>
+    </div>
+    <table id="statistics_table" class="table-container">
+        <thead>
+            <tr>
+                <th>Категория</th>
+                <th>Количество</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Плановые работы</td><td>{{ stats.planned }}</td></tr>
+            <tr><td>Внеплановые работы</td><td>{{ stats.unplanned }}</td></tr>
+            <tr><td>Завершённые плановые</td><td>{{ stats.completed_planned }}</td></tr>
+            <tr><td>Незавершённые плановые</td><td>{{ stats.uncompleted_planned }}</td></tr>
+            <tr><td>В процессе выполнения</td><td>{{ stats.in_progress }}</td></tr>
+            <tr><td>Всего</td><td>{{ stats.total }}</td></tr>
+        </tbody>
+    </table>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ваш существующий JavaScript...
+        });
+    </script>
+    <style>
+        .date-filter {
+            margin-bottom: 20px;
+        }
+        .date-filter label {
+            display: inline-block;
+            margin-right: 10px;
+            color: #555;
+            font-weight: bold;
+        }
+        .date-filter input[type="date"] {
+            width: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .date-filter button {
+            padding: 6px 12px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        .date-filter button:hover {
+            background-color: #0056b3;
+        }
+        .table-container {
+            max-width: 100%;
+            overflow-x: auto; /* Горизонтальный скроллинг */
+            overflow-y: auto; /* Вертикальный скроллинг */
+            max-height: 500px; /* Фиксированная высота для вертикального скроллинга */
+            margin-top: 20px;
+        }
+        #statistics_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+        #statistics_table th, #statistics_table td {
+            border: 1px solid #000;
+            padding: 8px;
+        }
+        #statistics_table th {
+            background-color: #D9D9D9;
+            font-weight: bold;
+            text-align: center;
+        }
+    </style>
+{% endblock %}

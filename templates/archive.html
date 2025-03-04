@@ -1,0 +1,191 @@
+﻿{% extends "base.html" %}
+{% block title %}Архив{% endblock %}
+{% block header %}Архив{% endblock %}
+{% block content %}
+    <div class="date-filter">
+        <form method="POST" action="/archive">
+            <input type="hidden" name="filter" value="true">
+            <label for="start_date">Дата начала:</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}">
+            <label for="end_date">Дата окончания:</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+            <button type="submit">Фильтр</button>
+        </form>
+    </div>
+    <form method="POST" action="/archive">
+        <input type="hidden" name="export" value="true">
+        <button type="submit">Выгрузить в Excel</button>
+    </form>
+    <table id="archive_table">
+        <thead>
+            <tr>
+                <th colspan="54">НЕДЕЛЬНОЕ ПЛАНИРОВАНИЕ РАБОТ</th>
+            </tr>
+            <tr>
+                <td colspan="54">Период выполнения: {{ format_date(start_date) }} — {{ format_date(end_date) }}</td>
+            </tr>
+            <tr>
+                <th rowspan="4">№</th>
+                <th rowspan="4">Организация</th>
+                <th rowspan="4">СП</th>
+                <th rowspan="4">Цех</th>
+                <th rowspan="4">Объект</th>
+                <th rowspan="4">Ответственный за подготовку</th>
+                <th rowspan="4">Ответственный за проведение</th>
+                <th rowspan="4">Описание работ</th>
+                <th rowspan="4">Наименование работ</th>
+                <th rowspan="4">Вид РPO</th>
+                <th rowspan="4">Согласование со смежными СП</th>
+                <th rowspan="4">Уровень оценки риска</th>
+                <th rowspan="4">Выезд рабочей группы</th>
+                <th colspan="7" rowspan="2">Планирование</th>
+                <th rowspan="4">Примечания (условия выполнения работ)</th>
+                <th rowspan="4">Статус НД</th>
+                <th rowspan="4">Текущий этап</th>
+                <th colspan="28" rowspan="2">Выполнение</th>
+                <th rowspan="4">Плановая</th>
+                <th rowspan="4">Статус выполнения</th>
+                <th rowspan="4">Примечание (причины невыполнения/причина проведения внеплановых работ)</th>
+            </tr>
+            <tr>
+                <!-- Второй уровень заголовков для дней недели -->
+            </tr>
+            <tr>
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th>{{ day }} {{ display_date }}</th>
+                {% endfor %}
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th colspan="4">{{ display_date }}</th>  <!-- Только дата, без дня недели -->
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <td></td>
+                {% endfor %}
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th>Утро</th><th>День</th><th>Вечер</th><th>Ночь</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for work in works %}
+                <tr>
+                    <td>{{ loop.index }}</td>  <!-- Номер строки -->
+                    <td>{{ work.organization }}</td>
+                    <td>{{ work.sp }}</td>
+                    <td>{{ work.workshop }}</td>
+                    <td>{{ work.object }}</td>
+                    <td>{{ work.resp_preparation }}</td>
+                    <td>{{ work.resp_execution }}</td>
+                    <td>{{ work.description }}</td>
+                    <td>{{ work.work_name }}</td>
+                    <td>{{ work.rpo_type }}</td>
+                    <td>{{ work.approval_adjacent }}</td>
+                    <td>{{ work.risk_level }}</td>
+                    <td>{{ work.working_group }}</td>
+                    {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                        <td>
+                            {% if work.work_type == 'Плановые' and work.approval_status == 'Согласовано' and work.dates %}
+                                {% set has_date = false %}
+                                {% for date in work.dates %}
+                                    {% if is_date_in_week(iso_date, date) %}
+                                        {% set has_date = true %}
+                                        Плановая: {{ format_date(date) }}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not has_date %}
+                                    -
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>{{ work.comments or '' }}</td>
+                    <td>{{ work.nd_status }}</td>
+                    <td>{{ work.work_type }}</td>  <!-- Текущий этап — work_type -->
+                    {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                        <!-- Убрали столбец с датой, оставили только время суток -->
+                        <td>{{ work.work_times.get(iso_date, {}).get('утро', '-') }}</td>  <!-- Утро — данные из work_times с дефолтом "-" -->
+                        <td>{{ work.work_times.get(iso_date, {}).get('день', '-') }}</td>  <!-- День — данные из work_times с дефолтом "-" -->
+                        <td>{{ work.work_times.get(iso_date, {}).get('вечер', '-') }}</td>  <!-- Вечер — данные из work_times с дефолтом "-" -->
+                        <td>{{ work.work_times.get(iso_date, {}).get('ночь', '-') }}</td>  <!-- Ночь — данные из work_times с дефолтом "-" -->
+                    {% endfor %}
+                    <td>{{ work.work_type }}</td>  <!-- Плановая — тип РPO -->
+                    <td>{{ work.execution_status }}</td>  <!-- Статус выполнения -->
+                    <td>{{ work.rejection_reason or work.comments or '' }}</td>  <!-- Примечание -->
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById('archive_table');
+            const headers = table.querySelectorAll('th');
+            headers.forEach(header => {
+                header.style.fontWeight = 'bold';
+                header.style.backgroundColor = '#D9D9D9';  // Светло-серый фон для заголовков
+                header.style.textAlign = 'center';
+                header.style.border = '1px solid #000';  // Границы
+            });
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                row.style.border = '1px solid #000';  // Границы для строк
+            });
+            const cells = table.querySelectorAll('td');
+            cells.forEach(cell => {
+                cell.style.border = '1px solid #000';  // Границы для ячеек
+                cell.style.padding = '5px';  // Отступы
+                cell.style.fontFamily = 'Arial, sans-serif';  // Шрифт
+                cell.style.fontSize = '12px';  // Размер шрифта
+                cell.style.textAlign = 'center';  // Выравнивание данных по центру
+            });
+        });
+    </script>
+    <style>
+        .date-filter {
+            margin-bottom: 20px;
+        }
+        .date-filter label {
+            display: inline-block;
+            margin-right: 10px;
+            color: #555;
+            font-weight: bold;
+        }
+        .date-filter input[type="date"] {
+            width: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .date-filter button {
+            padding: 6px 12px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        .date-filter button:hover {
+            background-color: #0056b3;
+        }
+        #archive_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+        #archive_table th, #archive_table td {
+            border: 1px solid #000;
+            padding: 5px;
+        }
+        #archive_table th {
+            background-color: #D9D9D9;
+            font-weight: bold;
+            text-align: center;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,60 @@
+﻿{% extends "base.html" %}
+{% block title %}Уведомления{% endblock %}
+{% block header %}Уведомления{% endblock %}
+{% block content %}
+    <h3>Ваши уведомления</h3>
+    {% if notifications %}
+        <ul class="notifications-list">
+            {% for notification in notifications %}
+                <li>
+                    <div class="notification-content">
+                        {% if notification.action_url and notification.is_active %}
+                            <a href="{{ notification.action_url }}" class="notification-link">{{ notification.message }}</a>
+                        {% else %}
+                            <span>{{ notification.message }}</span>
+                        {% endif %}
+                        <span class="notification-time">{{ notification.timestamp.strftime('%H:%M %d.%m.%Y') }}</span>
+                    </div>
+                    <div class="notification-actions">
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="notification_id" value="{{ notification.id }}">
+                            <button type="submit" name="mark_viewed" class="viewed-button">Просмотрено</button>
+                        </form>
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="notification_id" value="{{ notification.id }}">
+                            <button type="submit" name="delete_notification" class="delete-button">Удалить</button>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Уведомлений нет.</p>
+    {% endif %}
+    <script>
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('notification', function(data) {
+            if (data.user_id === {{ session['user_id']|tojson|safe }}) {
+                alert(data.message);
+                updateNotificationCount();
+            }
+        });
+
+        function updateNotificationCount() {
+            fetch('/notifications_count')
+                .then(response => response.json())
+                .then(data => {
+                    const countSpan = document.querySelector('.notification-count');
+                    if (data.count > 0) {
+                        countSpan.textContent = data.count;
+                        countSpan.style.display = 'inline';
+                    } else {
+                        countSpan.style.display = 'none';
+                    }
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', updateNotificationCount);
+    </script>
+{% endblock %}

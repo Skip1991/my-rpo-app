@@ -1,0 +1,121 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Учет работ{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body class="page-background">
+    <div class="top-bar">
+        {% if session['username'] %}
+            <span class="user-info">Вход выполнен: {{ session['username'] }} ({{ session['role'] }})</span>
+        {% endif %}
+        <div class="top-bar-right">
+            <a href="{{ url_for('notifications') }}" class="notification-icon">
+                <i class="fas fa-envelope"></i>
+                <span class="notification-count" {% if unread_notifications <= 0 %}style="display: none;"{% endif %}>{{ unread_notifications }}</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="logout-button">Выход</a>
+        </div>
+    </div>
+    <div class="sidebar">
+        <div class="menu-icon"><i class="fas fa-bars"></i></div>
+        <div class="menu">
+            <a href="{{ url_for('rpo_entry') }}"><button>Внесение РПО</button></a>
+            <a href="{{ url_for('rpo_approval') }}"><button>Согласование РПО</button></a>
+            <a href="{{ url_for('rpo_execution') }}"><button>Факт выполнения РПО</button></a>
+            <a href="{{ url_for('statistics') }}"><button>Статистика</button></a>
+            <a href="{{ url_for('archive') }}"><button>Архив</button></a>
+            <a href="{{ url_for('notifications') }}"><button>Уведомления</button></a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>{% block header %}{% endblock %}</h1>
+        <div id="content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <script>
+        const socket = io.connect('http://' + document.domain + ':' + location.port + '/', {
+            path: '/socket.io',
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            transports: ['websocket', 'polling'],
+            query: { token: 'my-token' }
+        });
+
+        socket.on('connect', function() {
+            console.log('Socket подключён с ID:', socket.id);
+        });
+
+        socket.on('reconnect', function() {
+            console.log('Socket переподключён с ID:', socket.id);
+        });
+
+        socket.on('connect_error', function(error) {
+            console.error('Ошибка подключения:', error.message);
+        });
+
+        socket.on('notification', function(data) {
+            if (data.user_id === {{ session['user_id']|tojson|safe }}) {
+                alert(data.message);
+                updateNotificationCount();
+            }
+        });
+
+        socket.on('update_works', function(data) {
+            console.log('Получено событие update_works:', JSON.stringify(data, null, 2));
+            if (data.work_id) {
+                const row = document.querySelector(`tr[data-work-id="${data.work_id}"]`);
+                if (row) {
+                    const statusCell = row.querySelector(`#status-${data.work_id}`);
+                    if (statusCell) {
+                        statusCell.textContent = data.execution_status;
+                        row.className = data.execution_status === 'Выполнено' ? 'approved' : 
+                                       data.execution_status === 'Не выполнено' ? 'rejected' : '';
+                        console.log(`Обновление строки: execution_status=${data.execution_status}, className=${row.className}`);
+                    }
+                    if (data.work_times) {
+                        const cells = row.querySelectorAll('td[data-date][data-period]');
+                        cells.forEach(cell => {
+                            const date = cell.getAttribute('data-date');
+                            const period = cell.getAttribute('data-period');
+                            const status = data.work_times[date] ? data.work_times[date][period] : '';
+                            console.log(`Обновление ячейки: date=${date}, period=${period}, status=${status}`);
+                            cell.textContent = status || ''; // Обновляем только текст
+                        });
+                    } else {
+                        console.log('work_times отсутствует в данных:', data);
+                    }
+                } else {
+                    console.log(`Строка с work_id=${data.work_id} не найдена`);
+                }
+            }
+        });
+
+        function updateNotificationCount() {
+            fetch('/notifications_count')
+                .then(response => response.json())
+                .then(data => {
+                    const countSpan = document.querySelector('.notification-count');
+                    if (data.count > 0) {
+                        countSpan.textContent = data.count;
+                        countSpan.style.display = 'inline';
+                    } else {
+                        countSpan.style.display = 'none';
+                    }
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Socket initialized:', socket);
+            updateNotificationCount();
+            socket.connect(); // Попытка явного подключения
+        });
+    </script>
+</body>
+</html>

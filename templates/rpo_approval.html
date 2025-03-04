@@ -1,0 +1,154 @@
+﻿{% extends "base.html" %}
+{% block title %}Согласование РПО{% endblock %}
+{% block header %}Согласование РПО{% endblock %}
+{% block content %}
+    {% include 'date_filter.html' %}
+    <table id="approval_table">
+        <thead>
+            <tr>
+                <th>Организация</th><th>СП</th><th>Цех</th><th>Объект</th>
+                <th>Отв. за подготовку</th><th>Отв. за проведение</th>
+                <th>Описание</th><th>Наименование</th><th>Вид РПО</th>
+                <th>Согл. СП</th><th>Риск</th><th>Группа</th><th>Тип</th>
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th>{{ day }} ({{ display_date }})</th>
+                {% endfor %}
+                <th>ПБОТОС</th><th>ЦИТС</th><th>ГИ</th><th>Согласование СП</th><th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for work in works %}
+                <tr class="{{ 'approved' if work.approval_status == 'Согласовано' else 'rejected' if 'Не согласовано' in work.approval_status else '' }}" data-work-id="{{ work.id }}">
+                    <td>{{ work.organization }}</td><td>{{ work.sp }}</td><td>{{ work.workshop }}</td><td>{{ work.object }}</td>
+                    <td>{{ work.resp_preparation }}</td><td>{{ work.resp_execution }}</td>
+                    <td>{{ work.description }}</td><td>{{ work.work_name }}</td><td>{{ work.rpo_type }}</td>
+                    <td>{{ work.approval_adjacent }}</td><td>{{ work.risk_level }}</td><td>{{ work.working_group }}</td>
+                    <td>{{ work.work_type }}</td>
+                    {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                        <td class="{{ 'yellow' if iso_date == work.start_date.strftime('%Y-%m-%d') or (iso_date > work.start_date.strftime('%Y-%m-%d') and iso_date < work.end_date.strftime('%Y-%m-%d')) or iso_date == work.end_date.strftime('%Y-%m-%d') else '' }}">
+                            {{ display_date if iso_date == work.start_date.strftime('%Y-%m-%d') or (iso_date > work.start_date.strftime('%Y-%m-%d') and iso_date < work.end_date.strftime('%Y-%m-%d')) or iso_date == work.end_date.strftime('%Y-%m-%d') else '' }}
+                        </td>
+                    {% endfor %}
+                    <td id="pbotos-{{ work.id }}">
+                        {% if work.pbotos_approved %}
+                            Согласовано
+                        {% elif work.rejected_by == 'pbotos' %}
+                            Не согласовано (ПБОТОС)
+                        {% else %}
+                            <form method="POST" class="approval-form">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <button type="submit" name="action" value="approve" class="yellow-button">Согласовать</button>
+                                <button type="button" onclick="showReasonPrompt(this.form, 'pbotos')" class="yellow-button reject">Не согласовано</button>
+                                <input type="hidden" name="reason" class="rejection-reason">
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td id="cits-{{ work.id }}">
+                        {% if work.cits_approved %}
+                            Согласовано
+                        {% elif work.rejected_by == 'cits' %}
+                            Не согласовано (ЦИТС)
+                        {% else %}
+                            <form method="POST" class="approval-form">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <button type="submit" name="action" value="approve" class="yellow-button">Согласовать</button>
+                                <button type="button" onclick="showReasonPrompt(this.form, 'cits')" class="yellow-button reject">Не согласовано</button>
+                                <input type="hidden" name="reason" class="rejection-reason">
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td id="gi-{{ work.id }}">
+                        {% if work.gi_approved %}
+                            Согласовано
+                        {% elif work.rejected_by == 'gi' %}
+                            Не согласовано (ГИ)
+                        {% else %}
+                            <form method="POST" class="approval-form">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <button type="submit" name="action" value="approve" class="yellow-button">Согласовать</button>
+                                <button type="button" onclick="showReasonPrompt(this.form, 'gi')" class="yellow-button reject">Не согласовано</button>
+                                <input type="hidden" name="reason" class="rejection-reason">
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td id="sp-{{ work.id }}">
+                        {% if work.sp_approved %}
+                            Согласовано
+                        {% elif work.rejected_by == 'sp' %}
+                            Не согласовано (СП)
+                        {% else %}
+                            <form method="POST" class="approval-form">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <button type="submit" name="action" value="approve" class="yellow-button">Согласовать</button>
+                                <button type="button" onclick="showReasonPrompt(this.form, 'sp')" class="yellow-button reject">Не согласовано</button>
+                                <input type="hidden" name="reason" class="rejection-reason">
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td id="status-{{ work.id }}">{{ work.approval_status }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <script>
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+        
+        socket.on('update_works', function(data) {
+            console.log('Получено событие:', data);
+            if (data.work_id) {
+                const row = document.querySelector(`tr[data-work-id="${data.work_id}"]`);
+                if (row) {
+                    const statusCell = row.querySelector(`#status-${data.work_id}`);
+                    statusCell.textContent = data.approval_status;
+                    row.className = data.approval_status === 'Согласовано' ? 'approved' : 
+                                   data.approval_status.includes('Не согласовано') ? 'rejected' : '';
+                    if (data.pbotos_approved) row.querySelector(`#pbotos-${data.work_id}`).innerHTML = 'Согласовано';
+                    else if (data.rejected_by === 'pbotos') row.querySelector(`#pbotos-${data.work_id}`).innerHTML = 'Не согласовано (ПБОТОС)';
+                    if (data.cits_approved) row.querySelector(`#cits-${data.work_id}`).innerHTML = 'Согласовано';
+                    else if (data.rejected_by === 'cits') row.querySelector(`#cits-${data.work_id}`).innerHTML = 'Не согласовано (ЦИТС)';
+                    if (data.gi_approved) row.querySelector(`#gi-${data.work_id}`).innerHTML = 'Согласовано';
+                    else if (data.rejected_by === 'gi') row.querySelector(`#gi-${data.work_id}`).innerHTML = 'Не согласовано (ГИ)';
+                    if (data.sp_approved) row.querySelector(`#sp-${data.work_id}`).innerHTML = 'Согласовано';
+                    else if (data.rejected_by === 'sp') row.querySelector(`#sp-${data.work_id}`).innerHTML = 'Не согласовано (СП)';
+                }
+            }
+        });
+
+        socket.on('notification', function(data) {
+            if (data.user_id === {{ session['user_id']|tojson|safe }}) {
+                alert(data.message);
+                updateNotificationCount();
+            }
+        });
+
+        function showReasonPrompt(form, role) {
+            const reason = prompt("Введите причину отклонения:");
+            if (reason === null || reason.trim() === "") {
+                return false;
+            }
+            const hiddenAction = document.createElement('input');
+            hiddenAction.type = 'hidden';
+            hiddenAction.name = 'action';
+            hiddenAction.value = 'reject';
+            form.appendChild(hiddenAction);
+            form.querySelector('.rejection-reason').value = reason;
+            form.submit();
+        }
+
+        function updateNotificationCount() {
+            fetch('/notifications_count')
+                .then(response => response.json())
+                .then(data => {
+                    const countSpan = document.querySelector('.notification-count');
+                    if (data.count > 0) {
+                        countSpan.textContent = data.count;
+                        countSpan.style.display = 'inline';
+                    } else {
+                        countSpan.style.display = 'none';
+                    }
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', updateNotificationCount);
+    </script>
+{% endblock %}

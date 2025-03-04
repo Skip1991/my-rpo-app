@@ -1,0 +1,8 @@
+﻿<div class="date-filter">
+    <form method="POST">
+        <label>Фильтр по дате:</label>
+        <input type="date" name="start_date" value="{{ start_date or '' }}" required>
+        <input type="date" name="end_date" value="{{ end_date or '' }}" required>
+        <button type="submit" name="filter">Применить</button>
+    </form>
+</div>

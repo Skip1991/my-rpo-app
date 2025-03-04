@@ -1,0 +1,291 @@
+﻿{% extends "base.html" %}
+{% block title %}Факт выполнения РПО{% endblock %}
+{% block header %}Факт выполнения РПО{% endblock %}
+{% block content %}
+    <div class="date-filter">
+        <form method="POST" action="/rpo_execution">
+            <input type="hidden" name="filter" value="true">
+            <label for="start_date">Дата начала:</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}">
+            <label for="end_date">Дата окончания:</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}">
+            <button type="submit">Фильтр</button>
+        </form>
+    </div>
+    <table id="execution_table" class="table-container">
+        <thead>
+            <tr>
+                <th>Организация</th><th>СП</th><th>Цех</th><th>Объект</th>
+                <th>Отв. за подготовку</th><th>Отв. за проведение</th>
+                <th>Описание</th><th>Наименование</th><th>Вид РПО</th>
+                <th>Согл. СП</th><th>Риск</th><th>Группа</th><th>Тип</th>
+                <th>Выезд рабочей группы</th>
+                <th>Статус НД</th>
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th colspan="4">{{ day }} ({{ display_date }})</th>
+                {% endfor %}
+                <th>Выполнение</th><th>Комментарии</th>
+            </tr>
+            <tr>
+                <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+                <th></th>
+                <th></th>
+                {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                    <th>Утро</th><th>День</th><th>Вечер</th><th>Ночь</th>
+                {% endfor %}
+                <th></th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for work in works %}
+                <tr class="{{ 'approved' if work.execution_status == 'Выполнено' else 'rejected' if work.execution_status == 'Не выполнено' else '' }}" data-work-id="{{ work.id }}">
+                    <td>{{ work.organization }}</td><td>{{ work.sp }}</td><td>{{ work.workshop }}</td><td>{{ work.object }}</td>
+                    <td>{{ work.resp_preparation }}</td><td>{{ work.resp_execution }}</td>
+                    <td>{{ work.description }}</td><td>{{ work.work_name }}</td><td>{{ work.rpo_type }}</td>
+                    <td>{{ work.approval_adjacent }}</td><td>{{ work.risk_level }}</td><td>{{ work.working_group }}</td>
+                    <td>{{ work.work_type }}</td>
+                    <td>{{ work.working_group }}</td>
+                    <td>
+                        <form method="POST" action="/rpo_execution">
+                            <input type="hidden" name="work_id" value="{{ work.id }}">
+                            <input type="text" name="nd_status" value="{{ work.nd_status }}" placeholder="Введите статус НД" list="nd-status-options">
+                            <button type="submit" name="save_status">Сохранить</button>
+                        </form>
+                    </td>
+                    {% for day, display_date, iso_date in get_week_dates(start_date, end_date) %}
+                        <td data-date="{{ iso_date }}" data-period="Утро">
+                            <form method="POST" action="/rpo_execution">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <input type="hidden" name="date" value="{{ iso_date }}">
+                                <input type="hidden" name="period" value="Утро">
+                                <input type="text" name="status" value="{{ work.work_times.get(iso_date, {}).get('Утро', '') }}" placeholder="Введите статус (Утро)" list="status-options">
+                                <button type="submit" name="save_status">Сохранить</button>
+                            </form>
+                        </td>
+                        <td data-date="{{ iso_date }}" data-period="День">
+                            <form method="POST" action="/rpo_execution">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <input type="hidden" name="date" value="{{ iso_date }}">
+                                <input type="hidden" name="period" value="День">
+                                <input type="text" name="status" value="{{ work.work_times.get(iso_date, {}).get('День', '') }}" placeholder="Введите статус (День)" list="status-options">
+                                <button type="submit" name="save_status">Сохранить</button>
+                            </form>
+                        </td>
+                        <td data-date="{{ iso_date }}" data-period="Вечер">
+                            <form method="POST" action="/rpo_execution">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <input type="hidden" name="date" value="{{ iso_date }}">
+                                <input type="hidden" name="period" value="Вечер">
+                                <input type="text" name="status" value="{{ work.work_times.get(iso_date, {}).get('Вечер', '') }}" placeholder="Введите статус (Вечер)" list="status-options">
+                                <button type="submit" name="save_status">Сохранить</button>
+                            </form>
+                        </td>
+                        <td data-date="{{ iso_date }}" data-period="Ночь">
+                            <form method="POST" action="/rpo_execution">
+                                <input type="hidden" name="work_id" value="{{ work.id }}">
+                                <input type="hidden" name="date" value="{{ iso_date }}">
+                                <input type="hidden" name="period" value="Ночь">
+                                <input type="text" name="status" value="{{ work.work_times.get(iso_date, {}).get('Ночь', '') }}" placeholder="Введите статус (Ночь)" list="status-options">
+                                <button type="submit" name="save_status">Сохранить</button>
+                            </form>
+                        </td>
+                    {% endfor %}
+                    <td id="status-{{ work.id }}">{{ work.execution_status }}</td>
+                    <td>
+                        <form method="POST" action="/rpo_execution">
+                            <input type="hidden" name="work_id" value="{{ work.id }}">
+                            <textarea name="comments">{{ work.comments or '' }}</textarea>
+                            <button type="submit">Сохранить</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Даталисты для автозаполнения -->
+    <datalist id="status-options">
+        <option value="Подготовка">
+        <option value="Проведение">
+        <option value="Завершено">
+        <option value="Срыв">
+    </datalist>
+    <datalist id="nd-status-options">
+        <option value="Оформление">
+        <option value="На согласовании">
+        <option value="Утверждение">
+        <option value="Выдан">
+        <option value="Не требуется">
+        <option value="Планируется">
+    </datalist>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    fetch('/rpo_execution', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.text())
+                    .then(html => {
+                        document.documentElement.innerHTML = html;
+                        // Повторная инициализация WebSocket после обновления
+                        const socket = io.connect('http://' + document.domain + ':' + location.port + '/', {
+                            path: '/socket.io',
+                            reconnection: true,
+                            reconnectionAttempts: Infinity,
+                            reconnectionDelay: 1000,
+                            reconnectionDelayMax: 5000,
+                            transports: ['websocket', 'polling'],
+                            query: { token: 'my-token' }
+                        });
+                        socket.on('connect', function() {
+                            console.log('Socket подключён с ID:', socket.id);
+                        });
+                        socket.on('reconnect', function() {
+                            console.log('Socket переподключён с ID:', socket.id);
+                        });
+                        socket.on('connect_error', function(error) {
+                            console.error('Ошибка подключения:', error.message);
+                        });
+                        socket.on('notification', function(data) {
+                            if (data.user_id === {{ session['user_id']|tojson|safe }}) {
+                                alert(data.message);
+                            }
+                        });
+                        socket.on('update_works', function(data) {
+                            console.log('Получено событие update_works:', JSON.stringify(data, null, 2));
+                            if (data.work_id) {
+                                const row = document.querySelector(`tr[data-work-id="${data.work_id}"]`);
+                                if (row) {
+                                    const statusCell = row.querySelector(`#status-${data.work_id}`);
+                                    if (statusCell) {
+                                        statusCell.textContent = data.execution_status;
+                                        row.className = data.execution_status === 'Выполнено' ? 'approved' : 
+                                                       data.execution_status === 'Не выполнено' ? 'rejected' : '';
+                                        console.log(`Обновление строки: execution_status=${data.execution_status}, className=${row.className}`);
+                                    }
+                                    if (data.work_times) {
+                                        const cells = row.querySelectorAll('td[data-date][data-period]');
+                                        cells.forEach(cell => {
+                                            const date = cell.getAttribute('data-date');
+                                            const period = cell.getAttribute('data-period');
+                                            let status = '';
+                                            if (data.work_times[date] && data.work_times[date][period]) {
+                                                status = decodeURIComponent(escape(data.work_times[date][period]));
+                                            }
+                                            console.log(`Обновление ячейки: date=${date}, period=${period}, status=${status}`);
+                                            cell.querySelector('input[name="status"]').value = status || '';
+                                        });
+                                    }
+                                    if (data.nd_status) {
+                                        const ndCell = row.querySelector('input[name="nd_status"]');
+                                        if (ndCell) {
+                                            ndCell.value = data.nd_status;
+                                            console.log(`Обновление статуса НД: ${data.nd_status}`);
+                                        }
+                                    }
+                                } else {
+                                    console.log(`Строка с work_id=${data.work_id} не найдена`);
+                                }
+                            }
+                        });
+                    })
+                    .catch(error => console.error('Ошибка при обновлении:', error));
+                });
+            });
+        });
+    </script>
+    <style>
+        .date-filter {
+            margin-bottom: 20px;
+        }
+        .date-filter label {
+            display: inline-block;
+            margin-right: 10px;
+            color: #555;
+            font-weight: bold;
+        }
+        .date-filter input[type="date"] {
+            width: 120px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .date-filter button {
+            padding: 6px 12px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+        .date-filter button:hover {
+            background-color: #0056b3;
+        }
+        .table-container {
+            max-width: 100%;
+            overflow-x: auto; /* Горизонтальный скроллинг */
+            overflow-y: auto; /* Вертикальный скроллинг */
+            max-height: 500px; /* Фиксированная высота для вертикального скроллинга */
+            margin-top: 20px;
+        }
+        #execution_table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+        #execution_table th, #execution_table td {
+            border: 1px solid #000;
+            padding: 8px;
+            min-width: 120px;
+        }
+        #execution_table th {
+            background-color: #D9D9D9;
+            font-weight: bold;
+            text-align: center;
+        }
+        tr.approved {
+            background-color: #d4edda; /* Зелёный для выполненных работ */
+        }
+        tr.rejected {
+            background-color: #f8d7da; /* Красный для срыва работ */
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        button {
+            padding: 4px 8px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        textarea {
+            width: 100%;
+            height: 60px;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            resize: vertical;
+        }
+    </style>
+{% endblock %}
